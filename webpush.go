@@ -20,6 +20,8 @@ import (
 
 const MaxRecordSize uint32 = 4096
 
+var ErrMaxPayloadExceeded = errors.New("payload exceeds the maximum record size")
+
 // saltFunc generates a salt of 16 bytes
 var saltFunc = func() ([]byte, error) {
 	salt := make([]byte, 16)
@@ -166,7 +168,17 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Pad content to max record size - 16 - header
 	// Padding ending delimeter
 	dataBuf.Write([]byte("\x02"))
-	pad(dataBuf, recordLength-recordBuf.Len())
+
+	maxPadLen := recordLength - recordBuf.Len()
+	payloadLen := dataBuf.Len()
+
+	padLen := maxPadLen - payloadLen
+	if padLen < 0 {
+		return nil, ErrMaxPayloadExceeded
+	}
+
+	padding := make([]byte, padLen)
+	dataBuf.Write(padding)
 
 	// Compose the ciphertext
 	ciphertext := gcm.Seal([]byte{}, nonce, dataBuf.Bytes(), nil)
@@ -242,12 +254,4 @@ func getHKDFKey(hkdf io.Reader, length int) ([]byte, error) {
 	}
 
 	return key, nil
-}
-
-func pad(payload *bytes.Buffer, maxPadLen int) {
-	payloadLen := payload.Len()
-	padLen := maxPadLen - payloadLen
-
-	padding := make([]byte, padLen)
-	payload.Write(padding)
 }

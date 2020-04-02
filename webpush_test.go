@@ -1,6 +1,7 @@
 package webpush
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 )
@@ -74,5 +75,23 @@ func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
 			resp.StatusCode,
 			201,
 		)
+	}
+}
+
+func TestSendNotificatonErrorsOnMaxPayload(t *testing.T) {
+	_, err := SendNotification(bytes.Repeat([]byte("A"), 3994), getStandardEncodedTestSubscription(), &Options{
+		HTTPClient:      &testHTTPClient{},
+		Subscriber:      "<EMAIL@EXAMPLE.COM>",
+		Topic:           "test_topic",
+		TTL:             0,
+		Urgency:         "low",
+		VAPIDPrivateKey: "testKey",
+	})
+	if err == nil {
+		t.Fatal("Expected: ErrMaxPayloadExceeded")
+	}
+
+	if err != ErrMaxPayloadExceeded {
+		t.Fatalf("expected: %v; got: %v", ErrMaxPayloadExceeded, err)
 	}
 }
